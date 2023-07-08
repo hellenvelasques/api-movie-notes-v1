@@ -1,4 +1,4 @@
-<h1 align="center"> API - RocketMovies </h1>
+<h1 align="center"> Backend - API - RocketMovies </h1>
 
 <h2 id="project">Projeto</h2>
 
