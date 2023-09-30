@@ -4,11 +4,17 @@ const AppError = require("../utils/AppError");
 class MovieNotesController {
   async create(request, response) {
     const { title, description, rating, tags } = request.body;
-    const { user_id } = request.params;
+    const user_id = request.user.id;
 
     if (rating < 1 || rating > 5) {
       throw new AppError(`O valor do campo 'rating' deve estar entre 1 e 5.`);
     }
+
+
+    if (!Array.isArray(tags) || tags.some(tag => typeof tag !== 'string')) {
+      throw new AppError("O campo 'tags' deve ser um array de strings. Ex: ['tag1', 'tag2']");
+    } 
+
 
     const [movie_note_id] = await knex('movie_notes').insert({
       title,
@@ -17,11 +23,11 @@ class MovieNotesController {
       user_id
     });
     
-    const tagsInsert = tags.map(name => {
+    const tagsInsert = tags.map((name) => {
       return {
         movie_note_id,
+        user_id,
         name,
-        user_id
       };
     });
     
@@ -43,14 +49,15 @@ class MovieNotesController {
   };
 
   async index(request, response) {
-    const { user_id, title, tags } = request.query;
+    const { title, tags } = request.query;
+    const user_id = request.user.id;
 
     let notes;
 
     if (tags) {
       const filterTags = tags.split(',').map(tag => tag.trim());
 
-      notes = await knex("MovieTags")
+      notes = await knex("movie_tags")
         .select([
           "movie_notes.id",
           "movie_notes.title",
@@ -59,7 +66,8 @@ class MovieNotesController {
         .where("movie_notes.user_id", user_id)
         .whereLike("movie_notes.title", `%${title}%`)
         .whereIn("name", filterTags)
-        .innerJoin("movie_notes", "movie_notes.id", "tags.note_id")
+        .innerJoin("movie_notes", "movie_notes.id", "movie_tags.movie_note_id")
+        .groupBy("movie_notes.id")
         .orderBy("movie_notes.title")
 
     } else {
@@ -71,7 +79,7 @@ class MovieNotesController {
 
     const userTags = await knex("movie_tags").where({ user_id });
     const notesWithTags = notes.map(note => {
-      const noteTags = userTags.filter(tag => tag.note_id === note.id);
+      const noteTags = userTags.filter(tag => tag.movie_note_id === note.id);
 
       return {
         ...note,
@@ -81,7 +89,7 @@ class MovieNotesController {
 
     return response.json(notesWithTags);
   }
-    
+
   async delete(request, response) {
     const { id } = request.params;
 
